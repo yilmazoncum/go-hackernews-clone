@@ -35,6 +35,9 @@ func GetTopItems(apiBase string) ([]int, error) {
 	if err != nil {
 		return nil, err
 	}
+
+	fmt.Println("GetTopItems()")
+
 	return ids, nil
 }
 
@@ -52,6 +55,8 @@ func GetItem(apiBase string, id int) (Item, error) {
 	if err != nil {
 		return item, err
 	}
+
+	fmt.Println("GetItem()")
 
 	return item, nil
 }
