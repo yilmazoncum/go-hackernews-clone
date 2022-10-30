@@ -1,12 +1,14 @@
 package main
 
 import (
+	"errors"
 	"flag"
 	"fmt"
 	"log"
 	"main/hn"
 	"net/http"
 	"net/url"
+	"sort"
 	"strings"
 	"text/template"
 	"time"
@@ -31,26 +33,10 @@ func handler(numStories int, templ *template.Template) http.HandlerFunc {
 
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		start := time.Now()
-		ids, err := hn.GetTopItems(apiBase)
+
+		stories, err := GetTopStories(numStories)
 		if err != nil {
-			http.Error(w, "Failed to load top stories", http.StatusInternalServerError)
-			return
-		}
-
-		var stories []item
-		for _, id := range ids {
-			hnItem, err := hn.GetItem(apiBase, id)
-			if err != nil {
-				continue
-			}
-			item := parseHNItem(hnItem)
-			//itemA := item{Item: hnItem, Host: hnItem.URL}
-
-			stories = append(stories, item)
-			if len(stories) >= numStories {
-				break
-			}
-
+			http.Error(w, err.Error(), http.StatusInternalServerError)
 		}
 
 		data := templateData{
@@ -66,6 +52,49 @@ func handler(numStories int, templ *template.Template) http.HandlerFunc {
 		}
 	})
 
+}
+
+func GetTopStories(numStories int) ([]item, error) {
+	ids, err := hn.GetTopItems(apiBase)
+	if err != nil {
+		return nil, errors.New("Failed to load top stories")
+	}
+
+	type result struct {
+		index int
+		item  item
+		err   error
+	}
+	resultCh := make(chan result)
+
+	for i := 0; i < numStories; i++ {
+		go func(index int, id int) {
+			hnItem, err := hn.GetItem(apiBase, id)
+			if err != nil {
+				resultCh <- result{err: err}
+			}
+			resultCh <- result{item: parseHNItem(hnItem)}
+		}(i, ids[i])
+	}
+
+	var results []result
+	for i := 0; i < numStories; i++ {
+		results = append(results, <-resultCh)
+	}
+
+	sort.Slice(results, func(i, j int) bool {
+		return results[i].index < results[j].index
+	})
+
+	var stories []item
+	for _, res := range results {
+		if err != nil {
+			continue
+		}
+		stories = append(stories, res.item)
+	}
+
+	return stories, nil
 }
 
 func parseHNItem(hnItem hn.Item) item {
