@@ -1,13 +1,6 @@
 package main
 
-import (
-	"fmt"
-	"log"
-	"net/http"
-	"text/template"
-)
-
-type Todo struct {
+/* type Todo struct {
 	Title string
 	Done  bool
 }
@@ -15,11 +8,23 @@ type Todo struct {
 type TodoPageData struct {
 	PageTitle string
 	Todos     []Todo
-}
+} */
+
+import (
+	"fmt"
+	"main/hn"
+)
+
+const apiBase = "https://hacker-news.firebaseio.com/v0"
 
 func main() {
 
-	tmpl := template.Must(template.ParseFiles("layout.html"))
+	/* ids, _ := hn.GetTopItems(apiBase)
+	fmt.Print(ids) */
+	item, _ := hn.GetItem(apiBase, 33387890)
+	fmt.Print(item)
+
+	/* tmpl := template.Must(template.ParseFiles("layout.html"))
 
 	http.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
 
@@ -38,5 +43,5 @@ func main() {
 	fmt.Printf("Starting server at port 8080\n")
 	if err := http.ListenAndServe(":8080", nil); err != nil {
 		log.Fatal(err)
-	}
+	} */
 }
