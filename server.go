@@ -60,14 +60,25 @@ func GetTopStories(numStories int) ([]item, error) {
 		return nil, errors.New("Failed to load top stories")
 	}
 
+	var stories []item
+	at := 0
+	for len(stories) < numStories {
+		need := (numStories - len(stories)) * 5 / 4
+		stories = append(stories, getStories(ids[at:at+need])...)
+		at += need
+	}
+	return stories[:numStories], nil
+}
+
+func getStories(ids []int) []item {
 	type result struct {
 		index int
 		item  item
 		err   error
 	}
-	resultCh := make(chan result)
 
-	for i := 0; i < numStories; i++ {
+	resultCh := make(chan result)
+	for i := 0; i < len(ids); i++ {
 		go func(index int, id int) {
 			hnItem, err := hn.GetItem(apiBase, id)
 			if err != nil {
@@ -78,7 +89,7 @@ func GetTopStories(numStories int) ([]item, error) {
 	}
 
 	var results []result
-	for i := 0; i < numStories; i++ {
+	for i := 0; i < len(ids); i++ {
 		results = append(results, <-resultCh)
 	}
 
@@ -88,13 +99,18 @@ func GetTopStories(numStories int) ([]item, error) {
 
 	var stories []item
 	for _, res := range results {
-		if err != nil {
+		if res.err != nil {
 			continue
 		}
-		stories = append(stories, res.item)
+		if isStoryLink(res.item) {
+			stories = append(stories, res.item)
+		}
 	}
+	return stories
+}
 
-	return stories, nil
+func isStoryLink(item item) bool {
+	return item.Type == "story" && item.URL != ""
 }
 
 func parseHNItem(hnItem hn.Item) item {
