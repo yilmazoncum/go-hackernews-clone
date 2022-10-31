@@ -10,11 +10,10 @@ import (
 	"net/url"
 	"sort"
 	"strings"
+	"sync"
 	"text/template"
 	"time"
 )
-
-const apiBase = "https://hacker-news.firebaseio.com/v0"
 
 func main() {
 	var port, numStories int
@@ -34,7 +33,7 @@ func handler(numStories int, templ *template.Template) http.HandlerFunc {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		start := time.Now()
 
-		stories, err := GetTopStories(numStories)
+		stories, err := getCachedStories(numStories)
 		if err != nil {
 			http.Error(w, err.Error(), http.StatusInternalServerError)
 		}
@@ -51,11 +50,31 @@ func handler(numStories int, templ *template.Template) http.HandlerFunc {
 			return
 		}
 	})
-
 }
 
-func GetTopStories(numStories int) ([]item, error) {
-	ids, err := hn.GetTopItems(apiBase)
+var cache []item
+var cacheExpiration time.Time
+var cacheMutex sync.Mutex
+
+func getCachedStories(numStories int) ([]item, error) {
+	cacheMutex.Lock()
+	defer cacheMutex.Unlock()
+	if time.Now().Sub(cacheExpiration) < 0 {
+		fmt.Print("Cached Storyies Return !!!")
+		return cache, nil
+	}
+	fmt.Print("getTopStories() ????")
+	stories, err := getTopStories(numStories)
+	if err != nil {
+		return nil, err
+	}
+	cache = stories
+	cacheExpiration = time.Now().Add(5 * time.Minute)
+	return cache, nil
+}
+
+func getTopStories(numStories int) ([]item, error) {
+	ids, err := hn.GetTopItems()
 	if err != nil {
 		return nil, errors.New("Failed to load top stories")
 	}
@@ -80,11 +99,11 @@ func getStories(ids []int) []item {
 	resultCh := make(chan result)
 	for i := 0; i < len(ids); i++ {
 		go func(index int, id int) {
-			hnItem, err := hn.GetItem(apiBase, id)
+			hnItem, err := hn.GetItem(id)
 			if err != nil {
 				resultCh <- result{err: err}
 			}
-			resultCh <- result{item: parseHNItem(hnItem)}
+			resultCh <- result{index: index, item: parseHNItem(hnItem)}
 		}(i, ids[i])
 	}
 

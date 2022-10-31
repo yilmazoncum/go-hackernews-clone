@@ -23,7 +23,7 @@ type Item struct {
 	URL  string `json:"url"`
 }
 
-func GetTopItems(apiBase string) ([]int, error) {
+func GetTopItems() ([]int, error) {
 	response, err := http.Get(fmt.Sprintf("%s/topstories.json", apiBase))
 	if err != nil {
 		return nil, err
@@ -39,7 +39,7 @@ func GetTopItems(apiBase string) ([]int, error) {
 	return ids, nil
 }
 
-func GetItem(apiBase string, id int) (Item, error) {
+func GetItem(id int) (Item, error) {
 	var item Item
 
 	response, err := http.Get(fmt.Sprintf("%s/item/%d.json", apiBase, id))
